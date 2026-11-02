@@ -1,452 +1,212 @@
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ghost Pulse Studio - Meme Party</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #0f172a; color: #f8fafc; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 15px; }
+        .card { background-color: #1e293b; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); width: 100%; max-width: 600px; text-align: center; border: 1px solid #334155; }
+        h1 { color: #38bdf8; margin-bottom: 5px; font-size: 26px; }
+        .subtitle { color: #94a3b8; font-size: 13px; margin-bottom: 20px; }
+        input[type="text"] { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #475569; background-color: #0f172a; color: #fff; font-size: 15px; margin-bottom: 12px; outline: none; }
+        button { width: 100%; padding: 12px; border-radius: 8px; border: none; background-color: #0284c7; color: white; font-size: 15px; font-weight: bold; cursor: pointer; margin-bottom: 8px; transition: 0.2s; }
+        button:hover { background-color: #0369a1; }
+        .secondary-btn { background-color: #334155; }
+        .secondary-btn:hover { background-color: #475569; }
+        .ready-btn { background-color: #16a34a; }
+        .ready-btn:hover { background-color: #15803d; }
+        .hidden { display: none; }
+        
+        .table-container { position: relative; width: 100%; height: 260px; background: #0f172a; border-radius: 130px; border: 2px dashed #38bdf8; margin: 15px 0; display: flex; align-items: center; justify-content: center; }
+        .table-center { text-align: center; max-width: 260px; padding: 10px; }
+        .player-badge { position: absolute; background: #1e293b; border: 2px solid #4ade80; padding: 5px 10px; border-radius: 20px; font-size: 11px; }
+        
+        .hand-container { display: flex; gap: 8px; overflow-x: auto; padding: 10px 0; justify-content: center; }
+        .hand-card { background: #0f172a; border: 2px solid #334155; border-radius: 10px; padding: 8px; width: 100px; cursor: pointer; flex-shrink: 0; transition: 0.2s; }
+        .hand-card:hover { border-color: #38bdf8; transform: translateY(-4px); }
+        .hand-card img { width: 100%; height: 75px; object-fit: cover; border-radius: 6px; }
+        .hand-card p { font-size: 10px; margin-top: 4px; color: #cbd5e1; }
+        .credits { margin-top: 15px; font-size: 12px; color: #64748b; }
+    </style>
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+</head>
+<body>
 
-// Başlangıç Soru Havuzu
-let defaultQuestions = [
-    "Grubun en zekisi kim?",
-    "Buradaki en sevdiğin kişi kim?",
-    "Issız bir adaya düşsen yanına alacağın ilk kişi kim?",
-    "Grubun en komiği kim?",
-    "Bir sırrını en rahat teslim edeceğin kişi kim?",
-    "En çok parayı kim harcar?",
-    "Gizli bir ajan olma ihtimali en yüksek kim?",
-    "Grubun en dedikoducusu kim?",
-    "Kötü adam rolüne en çok kim yakışır?",
-    "Gece yarısı tutuklansa kimi ararsın?",
-    "En çok kim geç kalır?",
-    "Zombi istilasında ilk kim elenir?",
-    "En iyi yemek yapan kim?",
-    "Grubun en romantiği kim?",
-    "Bir tartışmada asla geri adım atmayan kim?",
-    "Kendi dizisini çekse başrol kim olur?",
-    "En garip alışkanlığı olan kim?",
-    "Dünyayı gezmeye en çok kim meyilli?",
-    "Bir gün ünlü olma ihtimali en yüksek kim?",
-    "Grubun en sakarı kim?"
-];
+    <!-- LOBİ EKRANI -->
+    <div id="lobi-ekrani" class="card">
+        <h1>Ghost Pulse Studio</h1>
+        <div class="subtitle">Meme Party</div>
 
-const rooms = {};
+        <input type="text" id="kullanici-adi" placeholder="Oyuncu Adını Gir..." maxlength="15">
+        <input type="text" id="oda-kodu" placeholder="Oda Kodu (Katılmak İçin)" maxlength="6">
 
-// HTML, CSS ve JS'i tek dosyadan tarayıcıya sunuyoruz
-app.get('/', (req, res) => {
-    res.send(`
-        <!DOCTYPE html>
-        <html lang="tr">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Party Voting Game</title>
-            <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Montserrat:wght@600&family=Poppins:wght@500&family=Roboto:wght@500&family=Press+Start+2P&display=swap" rel="stylesheet">
-            <style>
-                * { box-sizing: border-box; font-family: 'Poppins', sans-serif; transition: all 0.3s ease; }
-                body { background-color: #0f172a; color: #fff; margin: 0; padding: 20px; }
-                .hidden { display: none !important; }
-                #flash-warning-overlay {
-                    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-                    background-color: rgba(255, 0, 0, 0.9); z-index: 9999;
-                    display: flex; justify-content: center; align-items: center;
-                    animation: flashAnim 0.4s infinite alternate;
-                }
-                #warning-text { font-size: 3rem; color: #fff; text-shadow: 2px 2px 10px #000; text-align: center; }
-                @keyframes flashAnim {
-                    from { background-color: rgba(255, 0, 0, 0.95); transform: scale(1); }
-                    to { background-color: rgba(100, 0, 0, 0.95); transform: scale(1.02); }
-                }
-                .card { background: #1e293b; padding: 25px; border-radius: 12px; max-width: 450px; margin: 50px auto; text-align: center; }
-                input, select { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: white; }
-                button { width: 100%; padding: 12px; margin: 5px 0; border-radius: 8px; border: none; background: #6366f1; color: white; font-weight: bold; cursor: pointer; }
-                button:hover { background: #4f46e5; }
-                .admin-btn { background: #e11d48; } .admin-btn:hover { background: #be123c; }
-                .danger-btn { background: #dc2626; }
-                #game-screen { display: flex; gap: 20px; max-width: 1100px; margin: 0 auto; }
-                #chat-section { flex: 1; background: #1e293b; border-radius: 12px; padding: 15px; display: flex; flex-direction: column; height: 550px; }
-                #chat-messages { flex: 1; overflow-y: auto; background: #0f172a; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
-                .chat-msg { margin: 5px 0; word-break: break-word; }
-                .chat-msg.admin { color: #f43f5e; font-weight: bold; border-left: 3px solid #f43f5e; padding-left: 5px; }
-                #main-game-section { flex: 2; background: #1e293b; border-radius: 12px; padding: 20px; }
-                #question-card { background: #334155; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 20px; }
-                .vote-card { display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 12px 20px; margin: 8px 0; border-radius: 8px; }
-                .voted-badge { background: #22c55e; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; }
-                .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
-                .admin-card { background: #1e293b; padding: 15px; border-radius: 10px; }
-                .color-picker { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
-                .dot { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; display: inline-block; border: 2px solid #fff; }
-                .modal { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.7); display:flex; justify-content:center; align-items:center; }
-                .modal-content { background: #1e293b; padding: 20px; border-radius: 10px; width: 300px; text-align: center; }
-            </style>
-        </head>
-        <body>
-            <div id="flash-warning-overlay" class="hidden">
-                <h1 id="warning-text">⚠️ DIKKAT! UYARI! ⚠️</h1>
+        <button onclick="odaKur()">Yeni Oda Kur</button>
+        <button onclick="odayaKatil()" class="secondary-btn">Odaya Katıl</button>
+
+        <div class="credits">Yapımcı: Özgür GÖK</div>
+    </div>
+
+    <!-- HAZIRLIK EKRANI -->
+    <div id="hazirlik-ekrani" class="card hidden">
+        <h2 style="color:#38bdf8;">Oda Kodu: <span id="lobby-oda-kodu"></span></h2>
+        <p class="subtitle">Herkes hazır olduğunda oyun başlayacak!</p>
+        
+        <div id="hazirlik-oyuncu-listesi" style="text-align:left; background:#0f172a; padding:12px; border-radius:10px; margin:12px 0; min-height:100px;"></div>
+
+        <button onclick="hazirOl()" id="hazir-btn" class="ready-btn">Hazırım / Oyunu Başlat</button>
+    </div>
+
+    <!-- OYUN EKRANI -->
+    <div id="oyun-ekrani" class="card hidden" style="max-width: 700px;">
+        <div style="display:flex; justify-content:space-between; font-size:12px; color:#94a3b8; margin-bottom:8px;">
+            <span>Oda: <span id="aktif-oda-kodu" style="color:#fff; font-weight:bold;"></span></span>
+            <span>Tur: <span id="tur-sayisi" style="color:#38bdf8; font-weight:bold;">1</span></span>
+        </div>
+
+        <div class="table-container" id="yuvarlak-masa">
+            <div class="table-center">
+                <div style="font-size:10px; color:#94a3b8;">GÜNÜN YAZISI:</div>
+                <div id="aktif-yazi" style="font-size:13px; font-weight:bold; color:#facc15; margin:5px 0;">Yükleniyor...</div>
             </div>
+        </div>
 
-            <div id="lobby-screen" class="card">
-                <h1>🎮 Parti Oyun Alanı</h1>
-                <input type="text" id="username-input" placeholder="Oyuncu Adınız..." />
-                <input type="text" id="room-code-input" placeholder="Oda Kodu..." />
-                <div class="button-group">
-                    <button onclick="createRoom()">Oda Kur</button>
-                    <button onclick="joinRoom()">Odaya Katıl</button>
-                </div>
-                <hr>
-                <button class="admin-btn" onclick="openAdminModal()">🔒 Yönetici Paneli</button>
-            </div>
+        <div style="text-align:left; font-size:11px; color:#94a3b8; margin-bottom:4px;">Kartını Seç:</div>
+        <div class="hand-container" id="el-kartlari"></div>
+        <div id="oyun-durum" style="margin-top:10px; font-size:13px; color:#4ade80; font-weight:bold;"></div>
+    </div>
 
-            <div id="admin-auth-modal" class="modal hidden">
-                <div class="modal-content">
-                    <h3>Yönetici Girişi</h3>
-                    <input type="password" id="admin-pass-input" placeholder="Şifre Giriniz (1221)" />
-                    <button onclick="loginAdmin()">Giriş Yap</button>
-                    <button class="cancel-btn" onclick="closeAdminModal()">Kapat</button>
-                </div>
-            </div>
+    <script>
+        const firebaseConfig = {
+            databaseURL: "https://ghostpulsemood-default-rtdb.europe-west1.firebasedatabase.app"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
 
-            <div id="game-screen" class="hidden">
-                <div id="chat-section">
-                    <h3>💬 Oda Sohbeti</h3>
-                    <div id="chat-messages"></div>
-                    <div class="chat-input-box">
-                        <input type="text" id="chat-input" placeholder="Mesajınızı yazın..." />
-                        <button onclick="sendChatMessage()">Gönder</button>
-                    </div>
-                </div>
-                <div id="main-game-section">
-                    <div id="question-card">
-                        <h2 id="current-question">Soru Yükleniyor...</h2>
-                    </div>
-                    <h3>Oy Kullanın:</h3>
-                    <div id="players-vote-list"></div>
-                </div>
-            </div>
+        let mevcutOda = "";
+        let oyuncuAdi = "";
 
-            <div id="admin-dashboard" class="hidden">
-                <h2>🛠️ Yönetici Kontrol Paneli</h2>
-                <button onclick="exitAdmin()">Paneli Kapat</button>
-                <div class="admin-grid">
-                    <div class="admin-card">
-                        <h3>📢 Aktif Odalar</h3>
-                        <div id="admin-room-list"></div>
-                    </div>
-                    <div class="admin-card">
-                        <h3>⚙️ Oda Yönetimi: <span id="selected-room-title">Seçilmedi</span></h3>
-                        <input type="text" id="admin-chat-input" placeholder="Yönetici olarak sohbet yaz..." />
-                        <button onclick="adminSendChat()">Mesaj Gönder</button>
-                        <h4>Odada Bulunan Oyuncular:</h4>
-                        <div id="admin-player-list"></div>
-                    </div>
-                    <div class="admin-card">
-                        <h3>🎨 Tema & Özelleştirme</h3>
-                        <div class="color-picker">
-                            <span class="dot" style="background:#ff4757" onclick="selectColor('#ff4757')"></span>
-                            <span class="dot" style="background:#2ed573" onclick="selectColor('#2ed573')"></span>
-                            <span class="dot" style="background:#1e90ff" onclick="selectColor('#1e90ff')"></span>
-                            <span class="dot" style="background:#ffa502" onclick="selectColor('#ffa502')"></span>
-                            <span class="dot" style="background:#3742fa" onclick="selectColor('#3742fa')"></span>
-                            <span class="dot" style="background:#9b59b6" onclick="selectColor('#9b59b6')"></span>
-                            <span class="dot" style="background:#e84393" onclick="selectColor('#e84393')"></span>
-                            <span class="dot" style="background:#00cec9" onclick="selectColor('#00cec9')"></span>
-                            <span class="dot" style="background:#d63031" onclick="selectColor('#d63031')"></span>
-                            <span class="dot" style="background:#2d3436" onclick="selectColor('#2d3436')"></span>
-                        </div>
-                        <select id="font-select" onchange="applyStyle()">
-                            <option value="'Poppins', sans-serif">Poppins (Modern)</option>
-                            <option value="'Montserrat', sans-serif">Montserrat (Şık)</option>
-                            <option value="'Caveat', cursive">Caveat (El Yazısı)</option>
-                            <option value="'Roboto', sans-serif">Roboto (Standart)</option>
-                            <option value="'Press Start 2P', cursive">Retro Game (8-Bit)</option>
-                        </select>
-                        <hr>
-                        <h3>🚨 Kırmızı Uyarı Tetikle</h3>
-                        <input type="text" id="admin-warning-text" placeholder="Uyarı metni..." />
-                        <button class="danger-btn" onclick="sendFlashWarning()">🚨 UYARI GÖNDER</button>
-                    </div>
-                    <div class="admin-card">
-                        <h3>❓ Soru Havuzu</h3>
-                        <input type="text" id="new-question-input" placeholder="Yeni soru ekle..." />
-                        <button onclick="addNewQuestion()">Ekle</button>
-                        <ul id="admin-question-list"></ul>
-                    </div>
-                </div>
-            </div>
+        const yaziHavuzu = [
+            "Pazartesi sabahı uyanınca verilen ilk tepki:",
+            "Kredi kartı ekstresini görünce akıldan geçenler:",
+            "Gece 3'te mutfakta gizlice atıştırma yaparken yakalanmak:",
+            "Hoca derste ani bir soru sorunca takınılan masum ifade:",
+            "Sınavdan beklediğinden yüksek not alınca:",
+            "İnternet bağlantısı bir anda koptuğundaki sima:"
+        ];
 
-            <script src="/socket.io/socket.io.js"></script>
-            <script>
-                const socket = io();
-                let currentRoom = null, username = "", selectedAdminRoom = null, adminQuestions = [], selectedColor = "#6366f1";
+        const gorselHavuzu = [
+            { id: 1, url: "https://picsum.photos/id/1025/200/150", aciklama: "Şok ve Şaşkınlık" },
+            { id: 2, url: "https://picsum.photos/id/237/200/150", aciklama: "Derin Düşünce" },
+            { id: 3, url: "https://picsum.photos/id/1069/200/150", aciklama: "Umursamaz" },
+            { id: 4, url: "https://picsum.photos/id/1062/200/150", aciklama: "Sinirli Bakış" },
+            { id: 5, url: "https://picsum.photos/id/338/200/150", aciklama: "Yorgun" }
+        ];
 
-                function createRoom() {
-                    const code = Math.floor(1000 + Math.random() * 9000).toString();
-                    document.getElementById('room-code-input').value = code;
-                    joinRoom();
-                }
-
-                function joinRoom() {
-                    username = document.getElementById('username-input').value.trim();
-                    const code = document.getElementById('room-code-input').value.trim();
-                    if (!username || !code) return alert("Lütfen adınızı ve oda kodunu girin!");
-                    currentRoom = code;
-                    socket.emit('joinRoom', { roomCode: code, username: username });
-                    document.getElementById('lobby-screen').classList.add('hidden');
-                    document.getElementById('game-screen').classList.remove('hidden');
-                }
-
-                socket.on('roomData', (roomData) => {
-                    document.getElementById('current-question').innerText = roomData.currentQuestion;
-                    renderPlayers(roomData.players);
-                });
-
-                function renderPlayers(players) {
-                    const list = document.getElementById('players-vote-list');
-                    list.innerHTML = "";
-                    players.forEach(player => {
-                        const div = document.createElement('div');
-                        div.className = "vote-card";
-                        div.innerHTML = \`
-                            <span>\${player.name}</span>
-                            <div>
-                                \${player.hasVoted ? '<span class="voted-badge">Oy Verdi</span>' : ''}
-                                \${player.name !== username ? \`<button style="width:auto; padding:6px 15px;" onclick="castVote('\${player.id}')">Oy Ver</button>\` : ''}
-                            </div>
-                        \`;
-                        list.appendChild(div);
-                    });
-                }
-
-                function castVote(targetId) { socket.emit('castVote', { targetId }); }
-
-                function sendChatMessage() {
-                    const input = document.getElementById('chat-input');
-                    if (!input.value.trim()) return;
-                    socket.emit('sendChatMessage', { message: input.value, senderName: username });
-                    input.value = "";
-                }
-
-                socket.on('newChatMessage', ({ sender, message, isAdmin }) => {
-                    const chatBox = document.getElementById('chat-messages');
-                    const msgDiv = document.createElement('div');
-                    msgDiv.className = \`chat-msg \${isAdmin ? 'admin' : ''}\`;
-                    msgDiv.innerText = \`\${sender}: \${message}\`;
-                    chatBox.appendChild(msgDiv);
-                    chatBox.scrollTop = chatBox.scrollHeight;
-                });
-
-                socket.on('questionChanged', (newQ) => { document.getElementById('current-question').innerText = newQ; });
-
-                socket.on('applyStyleChange', ({ color, font }) => {
-                    document.body.style.fontFamily = font;
-                    document.querySelectorAll('button').forEach(btn => btn.style.backgroundColor = color);
-                    document.getElementById('question-card').style.borderColor = color;
-                });
-
-                socket.on('triggerFlashWarning', (text) => {
-                    const overlay = document.getElementById('flash-warning-overlay');
-                    document.getElementById('warning-text').innerText = \`⚠️ \${text} ⚠️\`;
-                    overlay.classList.remove('hidden');
-                    setTimeout(() => overlay.classList.add('hidden'), 4000);
-                });
-
-                socket.on('kicked', () => { alert("Yönetici tarafından odadan atıldınız!"); window.location.reload(); });
-
-                function openAdminModal() { document.getElementById('admin-auth-modal').classList.remove('hidden'); }
-                function closeAdminModal() { document.getElementById('admin-auth-modal').classList.add('hidden'); }
-                function loginAdmin() { socket.emit('adminLogin', document.getElementById('admin-pass-input').value); }
-
-                socket.on('adminAuthSuccess', ({ rooms, questions }) => {
-                    closeAdminModal();
-                    document.getElementById('lobby-screen').classList.add('hidden');
-                    document.getElementById('admin-dashboard').classList.remove('hidden');
-                    adminQuestions = questions;
-                    renderAdminRooms(rooms);
-                    renderAdminQuestions();
-                });
-
-                socket.on('adminAuthFailure', (msg) => alert(msg));
-                socket.on('adminUpdateRooms', (rooms) => {
-                    if (!document.getElementById('admin-dashboard').classList.contains('hidden')) renderAdminRooms(rooms);
-                });
-
-                function renderAdminRooms(rooms) {
-                    const list = document.getElementById('admin-room-list');
-                    list.innerHTML = "";
-                    rooms.forEach(room => {
-                        const btn = document.createElement('button');
-                        btn.innerText = \`Oda: \${room.code} (\${room.playerCount} Oyuncu)\`;
-                        btn.onclick = () => selectAdminRoom(room);
-                        list.appendChild(btn);
-                    });
-                }
-
-                function selectAdminRoom(room) {
-                    selectedAdminRoom = room;
-                    document.getElementById('selected-room-title').innerText = room.code;
-                    const pList = document.getElementById('admin-player-list');
-                    pList.innerHTML = "";
-                    room.players.forEach(p => {
-                        const btn = document.createElement('button');
-                        btn.className = "danger-btn";
-                        btn.innerText = \`❌ \${p.name} (At)\`;
-                        btn.onclick = () => socket.emit('adminKickPlayer', { roomCode: room.code, playerId: p.id });
-                        pList.appendChild(btn);
-                    });
-                }
-
-                function adminSendChat() {
-                    const msg = document.getElementById('admin-chat-input').value;
-                    if (!selectedAdminRoom || !msg) return alert("Oda seç ve mesaj yaz!");
-                    socket.emit('adminSendMessage', { roomCode: selectedAdminRoom.code, message: msg });
-                    document.getElementById('admin-chat-input').value = "";
-                }
-
-                function selectColor(color) { selectedColor = color; applyStyle(); }
-                function applyStyle() {
-                    const font = document.getElementById('font-select').value;
-                    if (!selectedAdminRoom) return alert("Önce oda seç!");
-                    socket.emit('adminChangeStyle', { roomCode: selectedAdminRoom.code, color: selectedColor, font: font });
-                }
-
-                function sendFlashWarning() {
-                    const text = document.getElementById('admin-warning-text').value || "YÖNETİCİ UYARISI!";
-                    if (!selectedAdminRoom) return alert("Önce oda seç!");
-                    socket.emit('adminSendWarning', { roomCode: selectedAdminRoom.code, warningText: text });
-                }
-
-                function renderAdminQuestions() {
-                    const list = document.getElementById('admin-question-list');
-                    list.innerHTML = "";
-                    adminQuestions.forEach((q, index) => {
-                        const li = document.createElement('li');
-                        li.innerHTML = \`\${q} <button style="width:auto; padding:2px 6px;" onclick="setAsCurrentQuestion('\${q}')">Seç</button> <button style="width:auto; padding:2px 6px; background:red;" onclick="deleteQuestion(\%d)">Sil</button>\`;
-                        list.appendChild(li);
-                    });
-                }
-
-                function addNewQuestion() {
-                    const input = document.getElementById('new-question-input');
-                    if (!input.value.trim()) return;
-                    adminQuestions.push(input.value);
-                    socket.emit('adminUpdateQuestions', adminQuestions);
-                    input.value = "";
-                    renderAdminQuestions();
-                }
-
-                function deleteQuestion(index) {
-                    adminQuestions.splice(index, 1);
-                    socket.emit('adminUpdateQuestions', adminQuestions);
-                    renderAdminQuestions();
-                }
-
-                function setAsCurrentQuestion(q) {
-                    if (!selectedAdminRoom) return alert("Önce oda seç!");
-                    socket.emit('adminSetRoomQuestion', { roomCode: selectedAdminRoom.code, question: q });
-                }
-
-                function exitAdmin() { window.location.reload(); }
-            </script>
-        </body>
-        </html>
-    `);
-});
-
-// Socket.io İşlemleri
-io.on('connection', (socket) => {
-    socket.on('joinRoom', ({ roomCode, username }) => {
-        socket.join(roomCode);
-        socket.roomCode = roomCode;
-        socket.username = username;
-
-        if (!rooms[roomCode]) {
-            rooms[roomCode] = {
-                players: [],
-                currentQuestion: defaultQuestions[Math.floor(Math.random() * defaultQuestions.length)]
-            };
+        function odaKur() {
+            oyuncuAdi = document.getElementById('kullanici-adi').value.trim();
+            if(!oyuncuAdi) return alert("Kullanıcı adını gir!");
+            mevcutOda = Math.floor(100000 + Math.random() * 900000).toString();
+            
+            db.ref('odalar/' + mevcutOda).set({ kurucu: oyuncuAdi }).then(() => lobineGec());
         }
 
-        rooms[roomCode].players.push({ id: socket.id, name: username, hasVoted: false });
-        io.to(roomCode).emit('roomData', rooms[roomCode]);
-        io.emit('adminUpdateRooms', getAdminRoomList());
-    });
+        function odayaKatil() {
+            oyuncuAdi = document.getElementById('kullanici-adi').value.trim();
+            mevcutOda = document.getElementById('oda-kodu').value.trim();
+            if(!oyuncuAdi || !mevcutOda) return alert("Adını ve Oda Kodunu gir!");
 
-    socket.on('castVote', ({ targetId }) => {
-        const roomCode = socket.roomCode;
-        if (!roomCode || !rooms[roomCode]) return;
-        const player = rooms[roomCode].players.find(p => p.id === socket.id);
-        if (player) {
-            player.hasVoted = true;
-            io.to(roomCode).emit('roomData', rooms[roomCode]);
+            db.ref('odalar/' + mevcutOda).once('value', (snap) => {
+                if(!snap.exists()) return alert("Böyle bir oda bulunamadı!");
+                lobineGec();
+            });
         }
-    });
 
-    socket.on('sendChatMessage', ({ message, senderName }) => {
-        if (!socket.roomCode) return;
-        io.to(socket.roomCode).emit('newChatMessage', { sender: senderName || socket.username, message, isAdmin: false });
-    });
+        function lobineGec() {
+            document.getElementById('lobi-ekrani').classList.add('hidden');
+            document.getElementById('hazirlik-ekrani').classList.remove('hidden');
+            document.getElementById('lobby-oda-kodu').innerText = mevcutOda;
 
-    socket.on('adminLogin', (pass) => {
-        if (pass === '1221') {
-            socket.emit('adminAuthSuccess', { rooms: getAdminRoomList(), questions: defaultQuestions });
-        } else {
-            socket.emit('adminAuthFailure', 'Hatalı Şifre!');
+            db.ref('odalar/' + mevcutOda + '/oyuncular/' + oyuncuAdi).set({ isim: oyuncuAdi, hazir: false });
+
+            db.ref('odalar/' + mevcutOda + '/oyuncular').on('value', (snap) => {
+                const liste = document.getElementById('hazirlik-oyuncu-listesi');
+                liste.innerHTML = "<strong>Odadakiler:</strong><br>";
+                let herkesHazir = true, sayi = 0;
+
+                snap.forEach(child => {
+                    sayi++;
+                    const d = child.val();
+                    liste.innerHTML += `<div style="margin-top:4px; display:flex; justify-content:space-between;"><span>${d.isim}</span><span style="color:${d.hazir?'#4ade80':'#f87171'}">${d.hazir?'Hazır ✔':'Bekliyor'}</span></div>`;
+                    if(!d.hazir) herkesHazir = false;
+                });
+
+                if(herkesHazir && sayi > 0) oyunuBaslat();
+            });
         }
-    });
 
-    socket.on('adminSendMessage', ({ roomCode, message }) => {
-        io.to(roomCode).emit('newChatMessage', { sender: 'YÖNETİCİ', message, isAdmin: true });
-    });
+        function hazirOl() {
+            db.ref('odalar/' + mevcutOda + '/oyuncular/' + oyuncuAdi).update({ hazir: true });
+            document.getElementById('hazir-btn').innerText = "Hazırsın!";
+            document.getElementById('hazir-btn').disabled = true;
+        }
 
-    socket.on('adminKickPlayer', ({ roomCode, playerId }) => {
-        if (rooms[roomCode]) {
-            rooms[roomCode].players = rooms[roomCode].players.filter(p => p.id !== playerId);
-            const targetSocket = io.sockets.sockets.get(playerId);
-            if (targetSocket) {
-                targetSocket.emit('kicked');
-                targetSocket.leave(roomCode);
+        function oyunuBaslat() {
+            document.getElementById('hazirlik-ekrani').classList.add('hidden');
+            document.getElementById('oyun-ekrani').classList.remove('hidden');
+            document.getElementById('aktif-oda-kodu').innerText = mevcutOda;
+
+            const rastgeleYazi = yaziHavuzu[Math.floor(Math.random() * yaziHavuzu.length)];
+            db.ref('odalar/' + mevcutOda + '/aktifYazi').set(rastgeleYazi);
+
+            kartlariDagit();
+            masaDinle();
+        }
+
+        function kartlariDagit() {
+            const container = document.getElementById('el-kartlari');
+            container.innerHTML = "";
+            for(let i=0; i<5; i++) {
+                const k = gorselHavuzu[Math.floor(Math.random() * gorselHavuzu.length)];
+                const div = document.createElement('div');
+                div.className = 'hand-card';
+                div.innerHTML = `<img src="${k.url}"><p>${k.aciklama}</p>`;
+                div.onclick = () => {
+                    document.getElementById('oyun-durum').innerText = `Seçimin gönderildi: ${k.aciklama}`;
+                    db.ref('odalar/' + mevcutOda + '/hamleler/' + oyuncuAdi).set({ isim: oyuncuAdi, kart: k.aciklama });
+                };
+                container.appendChild(div);
             }
-            io.to(roomCode).emit('roomData', rooms[roomCode]);
-            io.emit('adminUpdateRooms', getAdminRoomList());
         }
-    });
 
-    socket.on('adminUpdateQuestions', (newQuestions) => { defaultQuestions = newQuestions; });
+        function masaDinle() {
+            db.ref('odalar/' + mevcutOda + '/aktifYazi').on('value', (s) => {
+                if(s.exists()) document.getElementById('aktif-yazi').innerText = `"${s.val()}"`;
+            });
 
-    socket.on('adminSetRoomQuestion', ({ roomCode, question }) => {
-        if (rooms[roomCode]) {
-            rooms[roomCode].currentQuestion = question;
-            io.to(roomCode).emit('questionChanged', question);
+            db.ref('odalar/' + mevcutOda + '/oyuncular').on('value', (snap) => {
+                const masa = document.getElementById('yuvarlak-masa');
+                masa.querySelectorAll('.player-badge').forEach(b => b.remove());
+                
+                let oyuncular = [];
+                snap.forEach(c => oyuncular.push(c.val()));
+                
+                oyuncular.forEach((o, i) => {
+                    const aci = (i / oyuncular.length) * 2 * Math.PI;
+                    const x = 95 * Math.cos(aci) + 130;
+                    const y = 95 * Math.sin(aci) + 110;
+                    const b = document.createElement('div');
+                    b.className = 'player-badge';
+                    b.style.left = `calc(50% + ${x - 40}px)`;
+                    b.style.top = `calc(50% + ${y - 20}px)`;
+                    b.innerText = o.isim;
+                    masa.appendChild(b);
+                });
+            });
         }
-    });
-
-    socket.on('adminChangeStyle', ({ roomCode, color, font }) => {
-        io.to(roomCode).emit('applyStyleChange', { color, font });
-    });
-
-    socket.on('adminSendWarning', ({ roomCode, warningText }) => {
-        io.to(roomCode).emit('triggerFlashWarning', warningText);
-    });
-
-    socket.on('disconnect', () => {
-        const roomCode = socket.roomCode;
-        if (roomCode && rooms[roomCode]) {
-            rooms[roomCode].players = rooms[roomCode].players.filter(p => p.id !== socket.id);
-            if (rooms[roomCode].players.length === 0) delete rooms[roomCode];
-            else io.to(roomCode).emit('roomData', rooms[roomCode]);
-            io.emit('adminUpdateRooms', getAdminRoomList());
-        }
-    });
-});
-
-function getAdminRoomList() {
-    return Object.keys(rooms).map(code => ({
-        code: code,
-        playerCount: rooms[code].players.length,
-        players: rooms[code].players,
-        currentQuestion: rooms[code].currentQuestion
-    }));
-}
-
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Sunucu ${PORT} portunda çalışıyor...`));
+    </script>
+</body>
+</html>

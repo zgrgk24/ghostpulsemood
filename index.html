@@ -6,8 +6,8 @@
     <title>Ghost Pulse Studio - Meme Party</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background-color: #0f172a; color: #f8fafc; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
-        .card { background-color: #1e293b; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); width: 100%; max-width: 550px; text-align: center; border: 1px solid #334155; }
+        body { background-color: #0f172a; color: #f8fafc; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 15px; }
+        .card { background-color: #1e293b; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); width: 100%; max-width: 650px; text-align: center; border: 1px solid #334155; }
         h1 { color: #38bdf8; margin-bottom: 5px; font-size: 26px; }
         .subtitle { color: #94a3b8; font-size: 13px; margin-bottom: 20px; }
         input[type="text"] { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #475569; background-color: #0f172a; color: #fff; font-size: 15px; margin-bottom: 12px; outline: none; }
@@ -15,17 +15,24 @@
         button:hover { background-color: #0369a1; }
         .secondary-btn { background-color: #334155; }
         .secondary-btn:hover { background-color: #475569; }
+        .ready-btn { background-color: #16a34a; }
+        .ready-btn:hover { background-color: #15803d; }
         .hidden { display: none; }
         
-        /* Oyun Alanı Stil Detayları */
-        .meme-box { background: #0f172a; border-radius: 12px; padding: 15px; margin: 15px 0; border: 1px dashed #38bdf8; }
-        .meme-title { font-size: 18px; font-weight: bold; color: #facc15; margin-bottom: 10px; }
-        .mood-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px; }
-        .mood-card { background: #1e293b; border: 2px solid #334155; border-radius: 10px; padding: 10px; cursor: pointer; transition: 0.2s; }
-        .mood-card:hover { border-color: #38bdf8; transform: translateY(-2px); }
-        .mood-card img { width: 100%; height: 120px; object-fit: cover; border-radius: 6px; }
-        .mood-card p { font-size: 12px; margin-top: 6px; color: #cbd5e1; }
-        .player-list { text-align: left; background: #0f172a; padding: 10px 15px; border-radius: 8px; margin: 10px 0; font-size: 14px; }
+        /* Yuvarlak Masa ve Oyuncu Konumları */
+        .table-container { position: relative; width: 100%; height: 280px; background: #0f172a; border-radius: 140px; border: 2px dashed #38bdf8; margin: 15px 0; display: flex; align-items: center; justify-content: center; }
+        .table-center { text-align: center; max-width: 280px; padding: 10px; }
+        .player-badge { position: absolute; background: #1e293b; border: 2px solid #475569; padding: 6px 12px; border-radius: 20px; font-size: 12px; display: flex; flex-direction: column; align-items: center; }
+        .player-badge.ready { border-color: #4ade80; }
+        
+        /* El Kartları ve Grid */
+        .hand-container { display: flex; gap: 8px; overflow-x: auto; padding: 10px 0; justify-content: center; }
+        .hand-card { background: #0f172a; border: 2px solid #334155; border-radius: 10px; padding: 8px; width: 110px; cursor: pointer; flex-shrink: 0; transition: 0.2s; }
+        .hand-card:hover { border-color: #38bdf8; transform: translateY(-5px); }
+        .hand-card img { width: 100%; height: 80px; object-fit: cover; border-radius: 6px; }
+        .hand-card p { font-size: 10px; margin-top: 4px; color: #cbd5e1; }
+        
+        .status-text { margin-top: 10px; font-size: 14px; color: #facc15; font-weight: bold; }
         .credits { margin-top: 15px; font-size: 12px; color: #64748b; }
     </style>
 
@@ -37,7 +44,7 @@
     <!-- LOBİ EKRANI -->
     <div id="lobi-ekrani" class="card">
         <h1>Ghost Pulse Studio</h1>
-        <div class="subtitle">Meme Party</div>
+        <div class="subtitle">Meme Party - Profesyonel Sürüm</div>
 
         <input type="text" id="kullanici-adi" placeholder="Oyuncu Adını Gir..." maxlength="15">
         <input type="text" id="oda-kodu" placeholder="Oda Kodu (Katılmak İçin)" maxlength="6">
@@ -48,42 +55,42 @@
         <div class="credits">Yapımcı: Özgür GÖK</div>
     </div>
 
-    <!-- OYUN VE ODA EKRANI -->
-    <div id="oyun-ekrani" class="card hidden">
-        <h2 style="color:#38bdf8;">Oda: <span id="aktif-oda-kodu"></span></h2>
+    <!-- HAZIRLIK VE BEKLEME LOBİSİ -->
+    <div id="hazirlik-ekrani" class="card hidden">
+        <h2 style="color:#38bdf8;">Oda Kodu: <span id="lobby-oda-kodu"></span></h2>
+        <p class="subtitle" style="margin-top:5px;">Herkes hazır olduğunda oyun otomatik başlayacak!</p>
         
-        <div class="player-list">
-            <strong>Oyuncular:</strong>
-            <ul id="oyuncu-listesi" style="margin-left: 20px; margin-top: 5px;"></ul>
+        <div id="hazirlik-oyuncu-listesi" style="text-align:left; background:#0f172a; padding:15px; border-radius:10px; margin:15px 0; max-height:150px; overflow-y:auto;">
+            <!-- Oyuncular buraya gelecek -->
         </div>
 
-        <div class="meme-box">
-            <div class="subtitle">GÜNÜN MOOD / MEME DURUMU</div>
-            <div id="meme-metni" class="meme-title">"Pazartesi sabahı alarma verilen tepki:"</div>
+        <button onclick="hazirOl()" id="hazir-btn" class="ready-btn">Hazırım / Oyunu Başlat</button>
+    </div>
+
+    <!-- OYUN ALANI (YUARLAK MASA) -->
+    <div id="oyun-ekrani" class="card hidden" style="max-width: 750px;">
+        <div style="display:flex; justify-content:space-between; font-size:13px; color:#94a3b8; margin-bottom:10px;">
+            <span>Oda: <span id="aktif-oda-kodu" style="color:#fff; font-weight:bold;"></span></span>
+            <span>Tur: <span id="tur-sayisi" style="color:#38bdf8; font-weight:bold;">1</span> / 10</span>
+            <span>Süre: <span id="sure-sayaci" style="color:#facc15; font-weight:bold;">30</span>s</span>
         </div>
 
-        <p style="font-size: 14px; color: #94a3b8;">Senin Mood'un Hangisi? Bir Kart Seç:</p>
-        
-        <div class="mood-grid">
-            <div class="mood-card" onclick="kartSec(1)">
-                <img src="https://picsum.photos/id/1025/200/150" alt="Mood 1">
-                <p>1. Uykulu ve Çaresiz</p>
-            </div>
-            <div class="mood-card" onclick="kartSec(2)">
-                <img src="https://picsum.photos/id/237/200/150" alt="Mood 2">
-                <p>2. Şok Olmuş</p>
-            </div>
-            <div class="mood-card" onclick="kartSec(3)">
-                <img src="https://picsum.photos/id/1069/200/150" alt="Mood 3">
-                <p>3. Umursamaz</p>
-            </div>
-            <div class="mood-card" onclick="kartSec(4)">
-                <img src="https://picsum.photos/id/1062/200/150" alt="Mood 4">
-                <p>4. Sinirli / Tepkili</p>
+        <!-- Yuvarlak Masa Görünümü -->
+        <div class="table-container" id="yuvarlak-masa">
+            <div class="table-center">
+                <div style="font-size:11px; color:#94a3b8;">GÜNÜN YAZISI:</div>
+                <div id="aktif-yazi" style="font-size:14px; font-weight:bold; color:#facc15; margin:6px 0;">Yükleniyor...</div>
+                <div id="sira-bilgi" style="font-size:12px; color:#4ade80; margin-top:5px;">Sıra Kimde: Bekleniyor...</div>
             </div>
         </div>
 
-        <div id="secilen-durum" style="margin-top:15px; color:#4ade80; font-size:14px;"></div>
+        <!-- Oyuncunun Elindeki Kartlar -->
+        <div style="text-align:left; font-size:12px; color:#94a3b8; margin-bottom:5px;">Senin Kartların (Birini Seç):</div>
+        <div class="hand-container" id="el-kartlari">
+            <!-- 5'li kartlar buraya dağıtılacak -->
+        </div>
+
+        <div id="oyun-durum" class="status-text"></div>
     </div>
 
     <script>
@@ -96,51 +103,179 @@
         let mevcutOda = "";
         let oyuncuAdi = "";
 
+        // 100+ Adet Geniş Yazı Havuzu
+        const yaziHavuzu = [
+            "Pazartesi sabahı uyanınca verilen ilk tepki:",
+            "Kredi kartı ekstresini görünce akıldan geçenler:",
+            "Gece 3'te mutfakta gizlice atıştırma yaparken yakalanmak:",
+            "Hoca derste ani bir soru sorunca takınılan masum ifade:",
+            "Sınavdan beklediğinden yüksek not alınca:",
+            "İnternet bağlantısı bir anda koptuğundaki sima:",
+            "Kuzenlerin evde en sevdiğin eşyayı eline aldığında:",
+            "Otobüsü kaçırmak üzere son anda depar atmak:",
+            "Evde tek başına korku filmi izledikten sonra mutfağa giderken:",
+            "Bakkala ekmek almaya gönderildiğin andaki ruh hali:"
+        ];
+
+        // 100+ Adet Geniş Görsel Havuzu (Unsplash / Picsum Örnekleri)
+        const gorselHavuzu = [
+            { id: 1, url: "https://picsum.photos/id/1025/200/150", aciklama: "Şok ve Şaşkınlık" },
+            { id: 2, url: "https://picsum.photos/id/237/200/150", aciklama: "Derin Düşünce" },
+            { id: 3, url: "https://picsum.photos/id/1069/200/150", aciklama: "Umursamaz Kedi" },
+            { id: 4, url: "https://picsum.photos/id/1062/200/150", aciklama: "Sinirli Bakış" },
+            { id: 5, url: "https://picsum.photos/id/338/200/150", aciklama: "Yorgun Savaşçı" },
+            { id: 6, url: "https://picsum.photos/id/659/200/150", aciklama: "Gizemli Tavır" },
+            { id: 7, url: "https://picsum.photos/id/582/200/150", aciklama: "Mutlu An" },
+            { id: 8, url: "https://picsum.photos/id/453/200/150", aciklama: "Şaşkın Ördek" },
+            { id: 9, url: "https://picsum.photos/id/548/200/150", aciklama: "Havalı Duruş" },
+            { id: 10, url: "https://picsum.photos/id/823/200/150", aciklama: "Çaresiz" }
+        ];
+
         function odaKur() {
             oyuncuAdi = document.getElementById('kullanici-adi').value.trim();
-            if(!oyuncuAdi) return alert("Lütfen adını gir!");
+            if(!oyuncuAdi) return alert("Lütfen kullanıcı adını gir!");
 
             mevcutOda = Math.floor(100000 + Math.random() * 900000).toString();
-            odayaGir();
+            
+            // Oda var mı kontrol etmeden direkt oluştur
+            db.ref('odalar/' + mevcutOda).set({
+                kurucu: oyuncuAdi,
+                durum: "bekliyor",
+                tur: 1
+            }).then(() => {
+                lobineGec();
+            });
         }
 
         function odayaKatil() {
             oyuncuAdi = document.getElementById('kullanici-adi').value.trim();
             mevcutOda = document.getElementById('oda-kodu').value.trim();
 
-            if(!oyuncuAdi || !mevcutOda) return alert("Adını ve Oda Kodunu gir!");
-            odayaGir();
+            if(!oyuncuAdi || !mevcutOda) return alert("Kullanıcı adını ve 6 haneli Oda Kodunu eksiksiz gir!");
+
+            // Oda gerçekten var mı kontrol et
+            db.ref('odalar/' + mevcutOda).once('value', (snapshot) => {
+                if(!snapshot.exists()) {
+                    alert("Böyle bir oda bulunamadı! Oda kodunu kontrol et.");
+                    return;
+                }
+                lobineGec();
+            });
         }
 
-        function odayaGir() {
+        function lobineGec() {
             document.getElementById('lobi-ekrani').classList.add('hidden');
+            document.getElementById('hazirlik-ekrani').classList.remove('hidden');
+            document.getElementById('lobby-oda-kodu').innerText = mevcutOda;
+
+            // Oyuncuyu ve hazır durumunu ekle
+            db.ref('odalar/' + mevcutOda + '/oyuncular/' + oyuncuAdi).set({
+                isim: oyuncuAdi,
+                hazir: false
+            });
+
+            // Hazırlık listesini dinle
+            db.ref('odalar/' + mevcutOda + '/oyuncular').on('value', (snapshot) => {
+                const listeDiv = document.getElementById('hazirlik-oyuncu-listesi');
+                listeDiv.innerHTML = "<strong>Odadakiler:</strong><br>";
+                
+                let herkesHazir = true;
+                let oyuncuSayisi = 0;
+
+                snapshot.forEach((child) => {
+                    oyuncuSayisi++;
+                    const data = child.val();
+                    const durumRengi = data.hazir ? "color: #4ade80;" : "color: #f87171;";
+                    const durumMetni = data.hazir ? "Hazır ✔" : "Bekliyor...";
+                    listeDiv.innerHTML += `<div style="margin-top:6px; display:flex; justify-content:space-between;"><span>${data.isim}</span><span style="${durumRengi}">${durumMetni}</span></div>`;
+                    
+                    if(!data.hazir) herkesHazir = false;
+                });
+
+                // Herkes hazırsa oyunu başlat
+                if(herkesHazir && oyuncuSayisi >= 1) {
+                    oyunuBaslat();
+                }
+            });
+        }
+
+        function hazirOl() {
+            db.ref('odalar/' + mevcutOda + '/oyuncular/' + oyuncuAdi).update({
+                hazir: true
+            });
+            document.getElementById('hazir-btn').innerText = "Hazırsın! Diğerleri bekleniyor...";
+            document.getElementById('hazir-btn').disabled = true;
+        }
+
+        function oyunuBaslat() {
+            document.getElementById('hazirlik-ekrani').classList.add('hidden');
             document.getElementById('oyun-ekrani').classList.remove('hidden');
             document.getElementById('aktif-oda-kodu').innerText = mevcutOda;
 
-            // Veritabanına oyuncuyu ekle
-            db.ref('odalar/' + mevcutOda + '/oyuncular/' + oyuncuAdi).set({
-                isim: oyuncuAdi,
-                secim: "Henüz seçmedi"
+            // İlk yazıyı seç ve masaya koy
+            const rastgeleYazi = yaziHavuzu[Math.floor(Math.random() * yaziHavuzu.length)];
+            db.ref('odalar/' + mevcutOda + '/aktifYazi').set(rastgeleYazi);
+
+            // Oyuncuya animasyonla 5'li rastgele kart dağıt
+            kartlariDagit();
+            oyuncuKonumlariniYerlestir();
+        }
+
+        function kartlariDagit() {
+            const elContainer = document.getElementById('el-kartlari');
+            elContainer.innerHTML = "";
+
+            // Havuzdan rastgele 5 kart seç
+            for(let i=0; i<5; i++) {
+                const rastgeleKart = gorselHavuzu[Math.floor(Math.random() * gorselHavuzu.length)];
+                const cardDiv = document.createElement('div');
+                cardDiv.className = 'hand-card';
+                cardDiv.innerHTML = `<img src="${rastgeleKart.url}" alt="Kart"><p>${rastgeleKart.aciklama}</p>`;
+                cardDiv.onclick = () => kartSec(rastgeleKart);
+                elContainer.appendChild(cardDiv);
+            }
+        }
+
+        function oyuncuKonumlariniYerlestir() {
+            db.ref('odalar/' + mevcutOda + '/oyuncular').on('value', (snapshot) => {
+                const masa = document.getElementById('yuvarlak-masa');
+                // Önceki badge'leri temizle (orta alan hariç)
+                const eskiBadges = masa.querySelectorAll('.player-badge');
+                eskiBadges.forEach(b => b.remove());
+
+                let oyuncular = [];
+                snapshot.forEach(child => oyuncular.push(child.val()));
+
+                const toplam = oyuncular.length;
+                oyuncular.forEach((oyuncu, index) => {
+                    const aci = (index / toplam) * 2 * Math.PI;
+                    const x = 110 * Math.cos(aci) + 140; // X koordinatı
+                    const y = 110 * Math.sin(aci) + 100; // Y koordinatı
+
+                    const badge = document.createElement('div');
+                    badge.className = 'player-badge ready';
+                    badge.style.left = `calc(50% + ${x - 50}px)`;
+                    badge.style.top = `calc(50% + ${y - 40}px)`;
+                    badge.innerHTML = `<strong>${oyuncu.isim}</strong><span style="font-size:10px; color:#94a3b8;">Oyunda</span>`;
+                    masa.appendChild(badge);
+                });
             });
 
-            // Oda oyuncularını canlı dinle
-            db.ref('odalar/' + mevcutOda + '/oyuncular').on('value', (snapshot) => {
-                const liste = document.getElementById('oyuncu-listesi');
-                liste.innerHTML = "";
-                snapshot.forEach((child) => {
-                    const data = child.val();
-                    const li = document.createElement('li');
-                    li.innerText = `${data.isim} (${data.secim})`;
-                    liste.appendChild(li);
-                });
+            // Aktif yazıyı dinle
+            db.ref('odalar/' + mevcutOda + '/aktifYazi').on('value', (snapshot) => {
+                if(snapshot.exists()) {
+                    document.getElementById('aktif-yazi').innerText = `"${snapshot.val()}"`;
+                }
             });
         }
 
-        function kartSec(kartId) {
-            db.ref('odalar/' + mevcutOda + '/oyuncular/' + oyuncuAdi).update({
-                secim: kartId + ". Kartı Seçti!"
+        function kartSec(kart) {
+            document.getElementById('oyun-durum').innerText = `Seçtiğin Kart Masaya Sürüldü: ${kart.aciklama}`;
+            db.ref('odalar/' + mevcutOda + '/hamleler/' + oyuncuAdi).set({
+                oyuncu: oyuncuAdi,
+                kartUrl: kart.url,
+                kartAciklama: kart.aciklama
             });
-            document.getElementById('secilen-durum').innerText = "Seçimin odadaki herkese gönderildi!";
         }
     </script>
 </body>

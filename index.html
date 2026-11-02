@@ -112,9 +112,9 @@
     </div>
 
     <script>
-        // Firebase Yapılandırması (Proje: ghostpulsemood)
+        // Firebase Yapılandırması (Doğru Avrupa Veritabanı URL'si)
         const firebaseConfig = {
-            databaseURL: "https://ghostpulsemood-default-rtdb.firebaseio.com"
+            databaseURL: "https://ghostpulsemood-default-rtdb.europe-west1.firebasedatabase.app"
         };
 
         // Firebase Başlatma
@@ -130,7 +130,7 @@
                 return;
             }
 
-            // Realtime Database test yazması
+            // Realtime Database veri kaydetme
             database.ref('oyuncular/' + nick).set({
                 kullaniciAdi: nick,
                 girisTarihi: Date.now()
